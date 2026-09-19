@@ -62,6 +62,13 @@ Antes de ejecutar **windowVM**, asegúrate de tener instalado lo siguiente:
 
 ---
 
+## Languages / Idiomas
+
+- 🇪🇸 [Versión en Español](windowvm_es.py)
+- 🇬🇧 [English Version](windowvm_en.py)
+
+---
+
 ## Instalación
 
 ### 1. Clonar el repositorio
