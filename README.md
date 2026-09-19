@@ -64,8 +64,8 @@ Antes de ejecutar **windowVM**, asegúrate de tener instalado lo siguiente:
 
 ## Languages / Idiomas
 
-- 🇪🇸 [Versión en Español](windowvm_es.py)
-- 🇬🇧 [English Version](windowvm_en.py)
+- 🇪🇸 [Versión en Español](windowvm.py)
+- 🇬🇧 [English Version](windowvm-english.py)
 
 ---
 
