@@ -244,9 +244,10 @@ class WindowVMApp:
                          font=THEME["fonts"]["small"], bg=THEME["colors"]["vm_card_bg"], fg="gray").pack(anchor="w")
 
                 # Start button
-                tk.Button(card, text="▶ Start", bg=THEME["colors"]["btn_success"], fg="white",
-                          font=THEME["fonts"]["text_bold"], relief="flat", cursor="hand2",
-                          command=lambda v=vm: self.start_vm(v)).pack(side="right", padx=10, pady=8)
+              tk.Button(card, text="▶ Start", bg=THEME["colors"]["btn_success"], fg="white",
+          highlightbackground=THEME["colors"]["btn_success"], # Forzar el color en macOS
+          font=THEME["fonts"]["text_bold"], relief="flat", cursor="hand2",
+          command=lambda v=vm: self.start_vm(v)).pack(side="right", padx=10, pady=8)
 
                 # Delete button
                 tk.Button(card, text="🗑", bg=THEME["colors"]["btn_danger"], fg="white",
@@ -462,25 +463,22 @@ class WindowVMApp:
                 messagebox.showerror("Error", f"Failed to create the virtual hard disk: {e}")
                 return
 
-        # 🚀 BASE COMMAND WITH HARDWARE ACCELERATION (HVF)
-        # This makes the VM run at near-native speed instead of at ~10%.
-        # Apple's Hypervisor Framework (HVF) can only accelerate a guest
-        # whose architecture matches the host's. This app always boots
-        # "qemu-system-x86_64", so on an Apple Silicon (arm64) Mac, HVF
-        # cannot accelerate it — only an Intel Mac can use HVF here. On
-        # Apple Silicon, fall back to software emulation ("tcg") instead
-        # of letting QEMU fail outright.
+               # 🚀 SELECCIÓN DINÁMICA DE ARQUITECTURA Y ACELERACIÓN PARA MACOS
         host_arch = platform.machine().lower()
+        
         if host_arch in ("arm64", "aarch64"):
-            accel = "tcg"
-            print("⚠️ Apple Silicon detected: HVF cannot accelerate an x86_64 guest "
-                  "on this CPU architecture. Falling back to software emulation "
-                  "(tcg) — it will work, but noticeably slower than on an Intel Mac.")
+            # Si la Mac es un chip Apple Silicon (M1/M2/M3/M4), usamos el motor ARM nativo
+            qemu_binary = "qemu-system-aarch64"
+            accel = "hvf" # ¡Aquí sí funciona la aceleración nativa de Apple para sistemas ARM!
+            print("🚀 Apple Silicon detected: Using native ARM64 QEMU engine with HVF hardware acceleration.")
         else:
+            # Si la Mac es una Intel antigua, usamos el motor clásico x86_64
+            qemu_binary = "qemu-system-x86_64"
             accel = "hvf"
+            print("💻 Intel Mac detected: Using x86_64 QEMU engine with HVF hardware acceleration.")
 
         command = [
-            "qemu-system-x86_64",
+            qemu_binary, # Elige el ejecutable correcto automáticamente según el chip de la Mac
             "-accel", accel,
             "-m", str(vm_info["ram"]),
             "-smp", f"cores={vm_info['cores']},threads={vm_info['threads']}",
