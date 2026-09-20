@@ -424,7 +424,7 @@ class WindowVMApp:
 
         messagebox.showinfo("VM Created", f"VM '{vm_info['name']}' created successfully!\n\nIt now appears in 'My VMs'.")
 
-    # ==========================================
+       # ==========================================
     # START VM WITH QEMU (OPTIMIZED FOR SSD)
     # ==========================================
     def start_vm_real(self, vm_info):
@@ -457,7 +457,7 @@ class WindowVMApp:
             # 2. 'discard=on' and 'detect-zeroes=unmap' enable real TRIM commands on the host SSD
             # 3. 'cache=none' paired with 'aio=threads' ensures data integrity and speed
             command.extend([
-                "-device", "virtio-blk-pci,drive=hd0",
+                "-device", "virtio-blk-pci,drive=hd0", # <--- FIXED: changed 'virtio-blk-papi' to 'pci'
                 "-drive", f"file={disk_path},if=none,id=hd0,format=qcow2,cache=none,aio=threads,discard=on,detect-zeroes=unmap"
             ])
             
@@ -478,7 +478,6 @@ class WindowVMApp:
                 # No longer using shlex.quote or plain string formatting, preventing any shell injection bugs.
                 print(f"Running QEMU securely via native subprocess...")
                 process = subprocess.Popen(command, shell=False)
-                process.wait()
                 process.wait()
                 print("VM shut down.")
             except Exception as e:
