@@ -107,6 +107,17 @@ Para evitar lentitud o congelamientos al emular sistemas modernos, **windowVM** 
 
 ---
 
+## Eco-sistema windowVM
+
+-ES [Version Español](windowvm.py)
+
+-EN [Version Ingles](windowvm_english.py)
+
+-MACOS [Version macOS](windowvm_macos.py)
+
+-LINUX [Version Linux](windowvm_linux.py)
+
+---
 
 ## Licencia
 
