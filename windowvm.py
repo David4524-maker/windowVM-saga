@@ -1,4 +1,4 @@
-import tkinter as tk 
+import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import json
 import os
@@ -79,10 +79,39 @@ class WindowVMApp:
         if os.path.exists("windowvm_data.json"):
             try:
                 with open("windowvm_data.json", "r") as f:
-                    self.vms_creadas = json.load(f)
+                    datos = json.load(f)
+                # BUG FIX: si el JSON viene de una versión distinta (p.ej. la
+                # versión en inglés, que guarda "name"/"cores"/"threads" en vez
+                # de "nombre"/"nucleos"/"hilos") o tiene entradas incompletas,
+                # antes esto rompía el renderizado de TODA la lista con un
+                # KeyError la próxima vez que se dibujaba (incluida cualquier
+                # VM nueva que se creara después). Ahora normalizamos cada
+                # entrada rellenando lo que falte, y descartamos solo las que
+                # de verdad no se puedan recuperar (sin dejar caer el resto).
+                self.vms_creadas = [v for v in (self._normalizar_vm(x) for x in datos) if v is not None]
             except Exception as e:
                 print(f"Error al cargar datos: {e}")
                 self.vms_creadas = []
+
+    def _normalizar_vm(self, vm):
+        """Rellena claves faltantes (por datos antiguos/incompatibles) para
+        que una VM con datos incompletos no rompa el resto de la lista."""
+        if not isinstance(vm, dict):
+            print(f"Entrada de VM inválida ignorada: {vm!r}")
+            return None
+        nombre = vm.get("nombre") or vm.get("name")
+        if not nombre:
+            print(f"VM sin nombre ignorada: {vm!r}")
+            return None
+        return {
+            "nombre": nombre,
+            "ram": vm.get("ram", vm.get("ram", "2048")),
+            "nucleos": vm.get("nucleos", vm.get("cores", "2")),
+            "hilos": vm.get("hilos", vm.get("threads", "4")),
+            "iso": vm.get("iso", ""),
+            "addons": vm.get("addons", False),
+            "disco": vm.get("disco", vm.get("disk", f"vms/{nombre}.qcow2")),
+        }
 
     def guardar_datos(self):
         try:
@@ -181,27 +210,35 @@ class WindowVMApp:
             return
 
         for i, vm in enumerate(self.vms_creadas):
-            card = tk.Frame(self.scrollable_frame, bg=THEME["colors"]["vm_card_bg"], relief="solid", bd=1)
-            card.pack(fill="x", pady=4, padx=5)
+            # BUG FIX: si una tarjeta individual falla al dibujarse (p.ej. por
+            # datos incompletos), antes esto abortaba el bucle entero y NINGUNA
+            # VM posterior se dibujaba, incluida la que se acababa de crear.
+            # Ahora se salta solo la tarjeta problemática y sigue con el resto.
+            try:
+                card = tk.Frame(self.scrollable_frame, bg=THEME["colors"]["vm_card_bg"], relief="solid", bd=1)
+                card.pack(fill="x", pady=4, padx=5)
 
-            # Información
-            info_frame = tk.Frame(card, bg=THEME["colors"]["vm_card_bg"])
-            info_frame.pack(side="left", padx=10, pady=8, fill="x", expand=True)
-            
-            tk.Label(info_frame, text=vm["nombre"], font=THEME["fonts"]["text_bold"], 
-                     bg=THEME["colors"]["vm_card_bg"], anchor="w").pack(anchor="w")
-            tk.Label(info_frame, text=f"RAM: {vm['ram']}MB  |  CPU: {vm['nucleos']}C/{vm['hilos']}T  |  Add-ons: {'Sí' if vm['addons'] else 'No'}", 
-                     font=THEME["fonts"]["small"], bg=THEME["colors"]["vm_card_bg"], fg="gray").pack(anchor="w")
+                # Información
+                info_frame = tk.Frame(card, bg=THEME["colors"]["vm_card_bg"])
+                info_frame.pack(side="left", padx=10, pady=8, fill="x", expand=True)
 
-            # Botón Iniciar
-            tk.Button(card, text="▶ Iniciar", bg=THEME["colors"]["btn_success"], fg="white", 
-                      font=THEME["fonts"]["text_bold"], relief="flat", cursor="hand2",
-                      command=lambda v=vm: self.iniciar_vm_real(v)).pack(side="right", padx=10, pady=8)
+                tk.Label(info_frame, text=vm["nombre"], font=THEME["fonts"]["text_bold"], 
+                         bg=THEME["colors"]["vm_card_bg"], anchor="w").pack(anchor="w")
+                tk.Label(info_frame, text=f"RAM: {vm['ram']}MB  |  CPU: {vm['nucleos']}C/{vm['hilos']}T  |  Add-ons: {'Sí' if vm['addons'] else 'No'}", 
+                         font=THEME["fonts"]["small"], bg=THEME["colors"]["vm_card_bg"], fg="gray").pack(anchor="w")
 
-            # Botón Eliminar
-            tk.Button(card, text="🗑", bg=THEME["colors"]["btn_danger"], fg="white", 
-                      font=("Arial", 10, "bold"), relief="flat", cursor="hand2", width=3,
-                      command=lambda idx=i: self.eliminar_vm(idx)).pack(side="right", padx=2, pady=8)
+                # Botón Iniciar
+                tk.Button(card, text="▶ Iniciar", bg=THEME["colors"]["btn_success"], fg="white", 
+                          font=THEME["fonts"]["text_bold"], relief="flat", cursor="hand2",
+                          command=lambda v=vm: self.iniciar_vm_real(v)).pack(side="right", padx=10, pady=8)
+
+                # Botón Eliminar
+                tk.Button(card, text="🗑", bg=THEME["colors"]["btn_danger"], fg="white", 
+                          font=("Arial", 10, "bold"), relief="flat", cursor="hand2", width=3,
+                          command=lambda idx=i: self.eliminar_vm(idx)).pack(side="right", padx=2, pady=8)
+            except Exception as e:
+                print(f"No se pudo dibujar la VM en la posición {i} ({vm}): {e}")
+                continue
 
     def eliminar_vm(self, index):
         if messagebox.askyesno("Confirmar", "¿Seguro que quieres eliminar esta VM de la lista?"):
@@ -339,27 +376,44 @@ class WindowVMApp:
         self.temp_addons = addons
         self.top_addons.destroy()
 
-        # Crear carpeta para las VMs
-        os.makedirs("vms", exist_ok=True)
-        
-        # Crear el registro de la VM
-        vm_info = {
-            "nombre": self.temp_nombre,
-            "ram": self.temp_ram,
-            "nucleos": self.temp_nucleos,
-            "hilos": self.temp_hilos,
-            "iso": self.temp_iso,
-            "addons": self.temp_addons,
-            "disco": f"vms/{self.temp_nombre}.qcow2"
-        }
-        
-        # Añadir a la lista y guardar
-        self.vms_creadas.append(vm_info)
-        self.guardar_datos()
-        
-        # ACTUALIZAR LA LISTA EN LA PANTALLA PRINCIPAL
-        self.actualizar_lista_vms()
-        
+        # BUG FIX: todo este bloque podía fallar en silencio (p.ej. sin
+        # permisos para crear la carpeta "vms", o cualquier otro error
+        # inesperado). Al estar dentro de un callback de botón, Tkinter
+        # tragaba la excepción, la mostraba solo en la consola y la VM
+        # quedaba sin crear ni mostrarse, sin que el usuario supiera por qué.
+        # Ahora se captura y se avisa con un mensaje claro.
+        try:
+            # Crear carpeta para las VMs
+            os.makedirs("vms", exist_ok=True)
+
+            # Crear el registro de la VM
+            vm_info = {
+                "nombre": self.temp_nombre,
+                "ram": self.temp_ram,
+                "nucleos": self.temp_nucleos,
+                "hilos": self.temp_hilos,
+                "iso": self.temp_iso,
+                "addons": self.temp_addons,
+                "disco": f"vms/{self.temp_nombre}.qcow2"
+            }
+
+            # Añadir a la lista y guardar
+            self.vms_creadas.append(vm_info)
+            self.guardar_datos()
+
+            # ACTUALIZAR LA LISTA EN LA PANTALLA PRINCIPAL
+            self.actualizar_lista_vms()
+        except Exception as e:
+            messagebox.showerror("Error al crear la VM", f"No se pudo crear la VM:\n{e}")
+            return
+
+        # BUG FIX: si ya había VMs llenando el área visible, la tarjeta nueva
+        # se añade al final de la lista pero el scroll se queda donde estaba
+        # (arriba), dejando la VM recién creada fuera de la vista. Forzamos
+        # el scroll hasta el final para que sea visible de inmediato.
+        self.canvas_vms.update_idletasks()
+        self.canvas_vms.yview_moveto(1.0)
+
         # Limpiar variables temporales
         self.temp_nombre = ""
         self.temp_iso = ""
