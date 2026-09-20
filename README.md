@@ -142,6 +142,6 @@ Este proyecto no tiene licencia XD
 <div align="center">
 
 ### Desarrollado con Python, Tkinter y mucha pasión por los sistemas operativos.
-¿Te ha gustado tanto? ¡Déjame una ⭐ en el repositorio!
+¿Te ha gustado tanto? ¡Déjame una ⭐ en el repositorio! Esta a la derecha de Fork
 
 </div>
