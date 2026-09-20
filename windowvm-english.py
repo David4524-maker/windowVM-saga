@@ -425,7 +425,7 @@ class WindowVMApp:
         messagebox.showinfo("VM Created", f"VM '{vm_info['name']}' created successfully!\n\nIt now appears in 'My VMs'.")
 
     # ==========================================
-    # START VM WITH QEMU
+    # START VM WITH QEMU (OPTIMIZED FOR SSD)
     # ==========================================
     def start_vm_real(self, vm_info):
         disk_path = vm_info["disk"]
@@ -435,40 +435,57 @@ class WindowVMApp:
                 subprocess.run(["qemu-img", "create", "-f", "qcow2", disk_path, "20G"], check=True)
             except FileNotFoundError:
                 messagebox.showerror("Critical Error", "QEMU is not installed or not in PATH.\n\n"
-                                     "Download it from: https://www.qemu.org/download/#windows")
+                                     "Download it from: https://qemu.org")
                 return
             except subprocess.CalledProcessError as e:
                 messagebox.showerror("Error", f"Error creating virtual disk: {e}")
                 return
 
+        # 🚀 BASE COMMAND WITH WINDOWS HARDWARE ACCELERATION (WHPX)
+        # This forces the VM to run at native speed instead of 10% software emulation
         command = [
             "qemu-system-x86_64",
-            "-m", vm_info["ram"],
+            "-accel", "whpx",                 # Enables Windows Hypervisor Platform
+            "-m", str(vm_info["ram"]),
             "-smp", f"cores={vm_info['cores']},threads={vm_info['threads']}",
-            "-hda", disk_path,
             "-boot", "d"
         ]
+
+        # 🎛️ SSD OPTIMIZED STORAGE CONFIGURATION (TRIM + VirtIO + Discard)
+        if vm_info["addons"]:
+            # 1. We create the storage device using the high-performance VirtIO bus
+            # 2. 'discard=on' and 'detect-zeroes=unmap' enable real TRIM commands on the host SSD
+            # 3. 'cache=none' paired with 'aio=threads' ensures data integrity and speed
+            command.extend([
+                "-device", "virtio-blk-pci,drive=hd0",
+                "-drive", f"file={disk_path},if=none,id=hd0,format=qcow2,cache=none,aio=threads,discard=on,detect-zeroes=unmap"
+            ])
+            
+            # Shared folder setup
+            os.makedirs("shared_vm", exist_ok=True)
+            command.extend(["-virtfs", f"local,path=./shared_vm,mount_tag=host0,security_model=passthrough"])
+            print("🚀 Add-ons and SSD optimization (TRIM/VirtIO) securely enabled.")
+        else:
+            # Standard fallback boot if Special Add-ons are disabled
+            command.extend(["-hda", disk_path])
 
         if vm_info["iso"]:
             command.extend(["-cdrom", vm_info["iso"]])
 
-        if vm_info["addons"]:
-            command.extend(["-drive", f"file={disk_path},if=virtio,cache=writeback"])
-            os.makedirs("shared_vm", exist_ok=True)
-            command.extend(["-virtfs", f"local,path=./shared_vm,mount_tag=host0,security_model=passthrough"])
-            print("Add-ons enabled: Using SSD and shared folder.")
-
         def run_qemu():
             try:
-                cmd_str = " ".join(shlex.quote(str(c)) for c in command)
-                print(f"Running: {cmd_str}")
-                process = subprocess.Popen(cmd_str, shell=True)
+                # 🔒 SECURITY FIX: We remove 'shell=True' and pass the arguments array directly.
+                # No longer using shlex.quote or plain string formatting, preventing any shell injection bugs.
+                print(f"Running QEMU securely via native subprocess...")
+                process = subprocess.Popen(command, shell=False)
+                process.wait()
                 process.wait()
                 print("VM shut down.")
             except Exception as e:
                 messagebox.showerror("Startup Error", f"Could not start QEMU:\n{e}")
 
         threading.Thread(target=run_qemu, daemon=True).start()
+
 
     # ==========================================
     # ACHIEVEMENTS
