@@ -434,69 +434,49 @@ class WindowVMApp:
 
         messagebox.showinfo("VM Created", f"VM '{vm_info['name']}' created successfully!\n\nIt now appears in 'My VMs'.")
 
-    # ==========================================
+        # ==========================================
     # START VM WITH QEMU (OPTIMIZED FOR SSD)
     # ==========================================
-    def start_vm(self, vm_info):
+    def start_vm_real(self, vm_info):
         disk_path = vm_info["disk"]
         if not os.path.exists(disk_path):
             try:
-                print(f"Creating virtual hard disk: {disk_path}...")
+                print(f"Creating virtual disk: {disk_path}...")
                 subprocess.run(["qemu-img", "create", "-f", "qcow2", disk_path, "20G"], check=True)
             except FileNotFoundError:
-                messagebox.showerror(
-                    "Critical Error",
-                    "QEMU is not installed or is not in the PATH.\n\n"
-                    "Install it with your package manager, e.g.:\n"
-                    "  sudo apt install qemu-system-x86 qemu-utils   (Debian/Ubuntu)\n"
-                    "  sudo dnf install qemu-kvm qemu-img            (Fedora)\n"
-                    "  sudo pacman -S qemu-full                      (Arch)\n\n"
-                    "Or download it from: https://qemu.org"
-                )
+                messagebox.showerror("Critical Error", "QEMU is not installed or not in PATH.\n\n"
+                                     "Download it from: https://qemu.org")
                 return
             except subprocess.CalledProcessError as e:
-                messagebox.showerror("Error", f"Failed to create the virtual hard disk: {e}")
+                messagebox.showerror("Error", f"Error creating virtual disk: {e}")
                 return
 
-        # 🚀 BASE COMMAND WITH HARDWARE ACCELERATION (KVM)
-        # This makes the VM run at near-native speed instead of at ~10%.
-        # KVM needs /dev/kvm to exist and be accessible by the current user
-        # (usually by being a member of the "kvm" group). If it isn't
-        # available, fall back to software emulation ("tcg") instead of
-        # letting QEMU fail outright.
-        if os.path.exists("/dev/kvm") and os.access("/dev/kvm", os.R_OK | os.W_OK):
-            accel = "kvm"
-        else:
-            accel = "tcg"
-            print("⚠️ /dev/kvm is not available or not accessible: falling back to "
-                  "software emulation (slower). Make sure virtualization is enabled "
-                  "in the BIOS/UEFI and that your user is in the 'kvm' group "
-                  "(sudo usermod -aG kvm $USER, then log out and back in).")
-
+        # 🚀 BASE COMMAND WITH WINDOWS HARDWARE ACCELERATION (WHPX)
+        # This forces the VM to run at native speed instead of 10% software emulation
         command = [
             "qemu-system-x86_64",
-            "-accel", accel,
+            "-accel", "whpx",                 # Enables Windows Hypervisor Platform
             "-m", str(vm_info["ram"]),
             "-smp", f"cores={vm_info['cores']},threads={vm_info['threads']}",
             "-boot", "d"
         ]
 
-        # 🎛️ DISK CONFIGURATION OPTIMIZED FOR SSD (TRIM + VirtIO + Discard)
+        # 🎛️ SSD OPTIMIZED STORAGE CONFIGURATION (TRIM + VirtIO + Discard)
         if vm_info["addons"]:
-            # 1. Create the storage device using the VirtIO bus (very fast)
-            # 2. 'discard=on' and 'detect-zeroes=unmap' enable real TRIM on the host SSD
-            # 3. 'cache=none' with 'aio=threads' for safe, fast I/O
+            # 1. We create the storage device using the high-performance VirtIO bus
+            # 2. 'discard=on' and 'detect-zeroes=unmap' enable real TRIM commands on the host SSD
+            # 3. 'cache=none' paired with 'aio=threads' ensures data integrity and speed
             command.extend([
-                "-device", "virtio-blk-pci,drive=hd0",
+                "-device", "virtio-blk-pci,drive=hd0", # <--- FIXED: changed 'virtio-blk-papi' to 'pci'
                 "-drive", f"file={disk_path},if=none,id=hd0,format=qcow2,cache=none,aio=threads,discard=on,detect-zeroes=unmap"
             ])
-
-            # Shared folder (optional, kept from the original)
+            
+            # Shared folder setup
             os.makedirs("shared_vm", exist_ok=True)
             command.extend(["-virtfs", f"local,path=./shared_vm,mount_tag=host0,security_model=passthrough"])
-            print("🚀 Add-ons and SSD optimization (TRIM/VirtIO) safely enabled.")
+            print("🚀 Add-ons and SSD optimization (TRIM/VirtIO) securely enabled.")
         else:
-            # Standard boot if Add-ons are not enabled
+            # Standard fallback boot if Special Add-ons are disabled
             command.extend(["-hda", disk_path])
 
         if vm_info["iso"]:
@@ -504,17 +484,17 @@ class WindowVMApp:
 
         def run_qemu():
             try:
-                # 🔒 SECURITY: no 'shell=True' — the command list is passed
-                # directly, with no shlex.quote or plain strings involved,
-                # avoiding command injection.
-                print(f"Running QEMU securely in native mode...")
+                # 🔒 SECURITY FIX: We remove 'shell=True' and pass the arguments array directly.
+                # No longer using shlex.quote or plain string formatting, preventing any shell injection bugs.
+                print(f"Running QEMU securely via native subprocess...")
                 process = subprocess.Popen(command, shell=False)
                 process.wait()
                 print("VM shut down.")
             except Exception as e:
-                messagebox.showerror("Error starting VM", f"Could not start QEMU:\n{e}")
+                messagebox.showerror("Startup Error", f"Could not start QEMU:\n{e}")
 
         threading.Thread(target=run_qemu, daemon=True).start()
+
 
     # ==========================================
     # ACHIEVEMENTS
