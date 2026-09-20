@@ -69,6 +69,12 @@ Antes de ejecutar **windowVM**, asegúrate de tener instalado lo siguiente:
 
 ---
 
+### Descargar ISO
+
+Puedes ir a [Internet Archive](https://archive.org) para descargar las ISO
+
+---
+
 ### 2. Verificar QEMU en el PATH
 Para que **windowVM** pueda ejecutar las ISOs correctamente, el ejecutable de QEMU debe estar accesible desde cualquier terminal de tu sistema.
 
