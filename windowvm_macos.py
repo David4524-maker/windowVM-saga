@@ -441,7 +441,7 @@ class WindowVMApp:
 
         messagebox.showinfo("VM Created", f"VM '{vm_info['name']}' created successfully!\n\nIt now appears in 'My VMs'.")
 
-    # ==========================================
+        # ==========================================
     # START VM WITH QEMU (OPTIMIZED FOR SSD)
     # ==========================================
     def start_vm(self, vm_info):
@@ -463,22 +463,34 @@ class WindowVMApp:
                 messagebox.showerror("Error", f"Failed to create the virtual hard disk: {e}")
                 return
 
-               # 🚀 SELECCIÓN DINÁMICA DE ARQUITECTURA Y ACELERACIÓN PARA MACOS
+        # 🚀 SELECCIÓN DINÁMICA DE ARQUITECTURA Y COMPATIBILIDAD PARA MACOS
         host_arch = platform.machine().lower()
+        iso_path = vm_info.get("iso", "")
+        
+        # Por defecto asumimos arquitectura estándar x86_64
+        qemu_binary = "qemu-system-x86_64"
+        accel = "hvf"
         
         if host_arch in ("arm64", "aarch64"):
-            # Si la Mac es un chip Apple Silicon (M1/M2/M3/M4), usamos el motor ARM nativo
-            qemu_binary = "qemu-system-aarch64"
-            accel = "hvf" # ¡Aquí sí funciona la aceleración nativa de Apple para sistemas ARM!
-            print("🚀 Apple Silicon detected: Using native ARM64 QEMU engine with HVF hardware acceleration.")
+            # Si es Apple Silicon, verificamos si la ISO es ARM para poder usar aceleración HVF.
+            # Nota: Si el usuario usa una ISO normal x86_64, debemos emularla por software con 'tcg'
+            # para que no crasheé el binario de qemu-system-aarch64.
+            if "arm" in iso_path.lower() or "aarch64" in iso_path.lower():
+                qemu_binary = "qemu-system-aarch64"
+                accel = "hvf"
+                print("🚀 Apple Silicon detected: Using native ARM64 QEMU engine with HVF hardware acceleration.")
+            else:
+                qemu_binary = "qemu-system-x86_64"
+                accel = "tcg"  # Emulación por software segura para ISOs de Intel en procesadores Apple M-series
+                print("💻 Apple Silicon detected but ISO is x86_64: Using Intel emulated engine via TCG.")
         else:
-            # Si la Mac es una Intel antigua, usamos el motor clásico x86_64
+            # Si la Mac es una Intel antigua, usamos el motor clásico x86_64 con aceleración nativa
             qemu_binary = "qemu-system-x86_64"
             accel = "hvf"
             print("💻 Intel Mac detected: Using x86_64 QEMU engine with HVF hardware acceleration.")
 
         command = [
-            qemu_binary, # Elige el ejecutable correcto automáticamente según el chip de la Mac
+            qemu_binary, 
             "-accel", accel,
             "-m", str(vm_info["ram"]),
             "-smp", f"cores={vm_info['cores']},threads={vm_info['threads']}",
@@ -487,9 +499,7 @@ class WindowVMApp:
 
         # 🎛️ DISK CONFIGURATION OPTIMIZED FOR SSD (TRIM + VirtIO + Discard)
         if vm_info["addons"]:
-            # 1. Create the storage device using the VirtIO bus (very fast)
-            # 2. 'discard=on' and 'detect-zeroes=unmap' enable real TRIM on the host SSD
-            # 3. 'cache=none' with 'aio=threads' for safe, fast I/O
+            # Código impecable: virtio-blk-pci es el bus correcto multiplataforma
             command.extend([
                 "-device", "virtio-blk-pci,drive=hd0",
                 "-drive", f"file={disk_path},if=none,id=hd0,format=qcow2,cache=none,aio=threads,discard=on,detect-zeroes=unmap"
@@ -503,14 +513,12 @@ class WindowVMApp:
             # Standard boot if Add-ons are not enabled
             command.extend(["-hda", disk_path])
 
-        if vm_info["iso"]:
-            command.extend(["-cdrom", vm_info["iso"]])
+        if iso_path:
+            command.extend(["-cdrom", iso_path])
 
         def run_qemu():
             try:
-                # 🔒 SECURITY: no 'shell=True' — the command list is passed
-                # directly, with no shlex.quote or plain strings involved,
-                # avoiding command injection.
+                # 🔒 SECURITY: no 'shell=True' — protected against injection commands
                 print(f"Running QEMU securely in native mode...")
                 process = subprocess.Popen(command, shell=False)
                 process.wait()
@@ -519,6 +527,7 @@ class WindowVMApp:
                 messagebox.showerror("Error starting VM", f"Could not start QEMU:\n{e}")
 
         threading.Thread(target=run_qemu, daemon=True).start()
+
 
     # ==========================================
     # ACHIEVEMENTS
