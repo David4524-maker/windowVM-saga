@@ -424,7 +424,7 @@ class WindowVMApp:
 
         messagebox.showinfo("VM Creada", f"¡VM '{vm_info['nombre']}' creada con éxito!\n\nYa aparece en 'Mis VMs'.")
 
-     # ==========================================
+        # ==========================================
     # INICIAR VM CON QEMU (OPTIMIZADO PARA SSD)
     # ==========================================
     def iniciar_vm_real(self, vm_info):
@@ -457,7 +457,7 @@ class WindowVMApp:
             # 2. 'discard=on' y 'detect-zeroes=unmap' habilitan el comando TRIM real en el SSD host
             # 3. 'cache=none' o 'cache=writeback' seguro con 'aio=threads'
             comando.extend([
-                "-device", "virtio-blk-papi,drive=hd0",
+                "-device", "virtio-blk-pci,drive=hd0", # <--- CORREGIDO: cambiado 'virtio-blk-papi' por 'pci'
                 "-drive", f"file={disco_path},if=none,id=hd0,format=qcow2,cache=none,aio=threads,discard=on,detect-zeroes=unmap"
             ])
             
