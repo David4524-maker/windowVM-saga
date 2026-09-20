@@ -7,7 +7,6 @@
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![Tkinter](https://img.shields.io/badge/GUI-Tkinter-blue?style=for-the-badge)](https://docs.python.org/3/library/tkinter.html)
 [![QEMU](https://img.shields.io/badge/Backend-QEMU-FF6600?style=for-the-badge)](https://www.qemu.org/)
-[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
 **Crea, gestiona e inicia máquinas virtuales reales desde una interfaz amigable y colorida.**
 
@@ -68,6 +67,57 @@ Antes de ejecutar **windowVM**, asegúrate de tener instalado lo siguiente:
 - 🇬🇧 [English Version](windowvm-english.py)
 
 ---
+
+### 2. Verificar QEMU en el PATH
+Para que **windowVM** pueda ejecutar las ISOs, el comando `qemu-system-x86_64` debe estar disponible en la terminal de tu sistema operativo.
+
+- **Windows:** Asegúrate de añadir `C:\Program Files\qemu` a las Variables de Entorno del Sistema.
+- **Linux (Ubuntu/Debian):** `sudo apt install qemu-system-x86`
+- **macOS:** `brew install qemu`
+
+### 3. Ejecutar la aplicación
+Inicia el gestor ejecutando el script principal en Python:
+
+```bash
+python windowvm.py
+```
+
+---
+
+##  Uso del Probador de ISOs
+
+1. **Crear una nueva instancia:** Haz clic en el botón **"Crear VM nueva +"**.
+2. **Cargar tu imagen:** Asigna un nombre e introduce la ruta de tu archivo `.iso` (admite instaladores de Windows, instaladores de Linux o herramientas Live como *Hiren's BootCD*).
+3. **Configurar el Hardware:** Define la memoria RAM y núcleos de procesamiento de acuerdo a las necesidades de la ISO.
+4. **¡Lanzar de inmediato!** Selecciona **"▶ Iniciar"** en la lista principal. El sistema forzará de forma automática el arranque prioritario desde la lectora de CD-ROM virtual (`-boot d`), ejecutando tu ISO de manera instantánea a velocidad nativa.
+
+---
+
+##  Optimización y Aceleración de Rendimiento
+
+Para evitar pantallas congeladas al ejecutar sistemas operativos pesados desde las ISOs, **windowVM** incluye un selector dinámico de aceleración por hardware según tu sistema anfitrión:
+
+* **En Windows (WHPX / HAXM):** Utiliza la Plataforma de Hipervisor de Windows de manera directa.
+* **En Linux (KVM):** Aprovecha el módulo nativo *Kernel-based Virtual Machine* para rendimiento cercano al metal.
+* **En macOS (HVF):** Utiliza el framework nativo *Hypervisor.framework* de Apple.
+
+>  **Tip de Velocidad:** Si usas Windows, asegúrate de activar la casilla **"Plataforma de hipervisor de Windows"** en la sección *Activar o desactivar las características de Windows* dentro del Panel de Control.
+
+---
+
+## Licencia
+
+Este proyecto no tiene licencia
+
+---
+
+<div align="center">
+
+### ¡Hecho con Python y mucha pasión por la virtualización!
+Si este probador de ISOs te ha gustado tanto, no dudes en dejarle una ⭐ al repositorio.
+
+</div>
+
 
 ## Instalación
 
