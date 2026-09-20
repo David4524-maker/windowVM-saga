@@ -122,7 +122,7 @@ Para evitar lentitud o congelamientos al emular sistemas modernos, **windowVM** 
 
 ## Licencia
 
-Este proyecto no tiene licencia
+Este proyecto no tiene licencia XD
 
 ---
 
