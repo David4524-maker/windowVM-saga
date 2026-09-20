@@ -424,8 +424,8 @@ class WindowVMApp:
 
         messagebox.showinfo("VM Creada", f"¡VM '{vm_info['nombre']}' creada con éxito!\n\nYa aparece en 'Mis VMs'.")
 
-    # ==========================================
-    # INICIAR VM CON QEMU
+     # ==========================================
+    # INICIAR VM CON QEMU (OPTIMIZADO PARA SSD)
     # ==========================================
     def iniciar_vm_real(self, vm_info):
         disco_path = vm_info["disco"]
@@ -435,40 +435,56 @@ class WindowVMApp:
                 subprocess.run(["qemu-img", "create", "-f", "qcow2", disco_path, "20G"], check=True)
             except FileNotFoundError:
                 messagebox.showerror("Error Crítico", "QEMU no está instalado o no está en el PATH.\n\n"
-                                     "Descárgalo de: https://www.qemu.org/download/#windows")
+                                     "Descárgalo de: https://qemu.org")
                 return
             except subprocess.CalledProcessError as e:
                 messagebox.showerror("Error", f"Error al crear el disco duro virtual: {e}")
                 return
 
+        # 🚀 COMANDO BASE CON ACELERACIÓN POR HARDWARE DE WINDOWS (WHPX)
+        # Esto hace que la VM vaya a velocidad nativa y no al 10%
         comando = [
             "qemu-system-x86_64",
-            "-m", vm_info["ram"],
+            "-accel", "whpx",                 # Activa Hyper-V de Windows para acelerar la CPU
+            "-m", str(vm_info["ram"]),
             "-smp", f"cores={vm_info['nucleos']},threads={vm_info['hilos']}",
-            "-hda", disco_path,
             "-boot", "d"
         ]
+
+        # 🎛️ CONFIGURACIÓN DE DISCO OPTIMIZADA PARA SSD (TRIM + VirtIO + Discard)
+        if vm_info["addons"]:
+            # 1. Creamos el dispositivo de almacenamiento usando el bus VirtIO (ultra rápido)
+            # 2. 'discard=on' y 'detect-zeroes=unmap' habilitan el comando TRIM real en el SSD host
+            # 3. 'cache=none' o 'cache=writeback' seguro con 'aio=threads'
+            comando.extend([
+                "-device", "virtio-blk-papi,drive=hd0",
+                "-drive", f"file={disco_path},if=none,id=hd0,format=qcow2,cache=none,aio=threads,discard=on,detect-zeroes=unmap"
+            ])
+            
+            # Carpeta compartida (Opcional, se mantiene de tu código original)
+            os.makedirs("compartido_vm", exist_ok=True)
+            comando.extend(["-virtfs", f"local,path=./compartido_vm,mount_tag=host0,security_model=passthrough"])
+            print("🚀 Add-ons y optimización de SSD (TRIM/VirtIO) activados de forma segura.")
+        else:
+            # Arranque estándar si no se activan los Add-ons
+            comando.extend(["-hda", disco_path])
 
         if vm_info["iso"]:
             comando.extend(["-cdrom", vm_info["iso"]])
 
-        if vm_info["addons"]:
-            comando.extend(["-drive", f"file={disco_path},if=virtio,cache=writeback"])
-            os.makedirs("compartido_vm", exist_ok=True)
-            comando.extend(["-virtfs", f"local,path=./compartido_vm,mount_tag=host0,security_model=passthrough"])
-            print("Add-ons activados: Usando SSD y carpeta compartida.")
-
         def run_qemu():
             try:
-                cmd_str = " ".join(shlex.quote(str(c)) for c in comando)
-                print(f"Ejecutando: {cmd_str}")
-                proceso = subprocess.Popen(cmd_str, shell=True)
+                # 🔒 SEGURIDAD: Eliminamos 'shell=True' y pasamos la lista de comandos directamente.
+                # Ya no usamos shlex.quote ni strings planos, evitando inyecciones de código.
+                print(f"Ejecutando QEMU de forma segura de modo nativo...")
+                proceso = subprocess.Popen(comando, shell=False)
                 proceso.wait()
                 print("VM apagada.")
             except Exception as e:
                 messagebox.showerror("Error al iniciar", f"No se pudo iniciar QEMU:\n{e}")
 
         threading.Thread(target=run_qemu, daemon=True).start()
+
 
     # ==========================================
     # LOGROS
