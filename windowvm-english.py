@@ -79,10 +79,39 @@ class WindowVMApp:
         if os.path.exists("windowvm_data.json"):
             try:
                 with open("windowvm_data.json", "r") as f:
-                    self.vms_created = json.load(f)
+                    data = json.load(f)
+                # BUG FIX: if the JSON came from a different version (e.g. the
+                # Spanish version, which stores "nombre"/"nucleos"/"hilos"
+                # instead of "name"/"cores"/"threads") or has incomplete
+                # entries, this used to break rendering of the WHOLE list with
+                # a KeyError the next time it was drawn (including any new VM
+                # created afterwards). Now each entry is normalized, filling
+                # in whatever is missing, and only entries that truly can't be
+                # recovered are dropped (without taking down the rest).
+                self.vms_created = [v for v in (self._normalize_vm(x) for x in data) if v is not None]
             except Exception as e:
                 print(f"Error loading data: {e}")
                 self.vms_created = []
+
+    def _normalize_vm(self, vm):
+        """Fill in missing keys (from old/incompatible data) so one VM with
+        incomplete data doesn't break the rest of the list."""
+        if not isinstance(vm, dict):
+            print(f"Ignoring invalid VM entry: {vm!r}")
+            return None
+        name = vm.get("name") or vm.get("nombre")
+        if not name:
+            print(f"Ignoring VM with no name: {vm!r}")
+            return None
+        return {
+            "name": name,
+            "ram": vm.get("ram", "2048"),
+            "cores": vm.get("cores", vm.get("nucleos", "2")),
+            "threads": vm.get("threads", vm.get("hilos", "4")),
+            "iso": vm.get("iso", ""),
+            "addons": vm.get("addons", False),
+            "disk": vm.get("disk", vm.get("disco", f"vms/{name}.qcow2")),
+        }
 
     def save_data(self):
         try:
@@ -181,27 +210,35 @@ class WindowVMApp:
             return
 
         for i, vm in enumerate(self.vms_created):
-            card = tk.Frame(self.scrollable_frame, bg=THEME["colors"]["vm_card_bg"], relief="solid", bd=1)
-            card.pack(fill="x", pady=4, padx=5)
+            # BUG FIX: if a single card failed to render (e.g. incomplete
+            # data), this used to abort the whole loop and NO further VM
+            # would be drawn, including the one that was just created. Now
+            # only the problematic card is skipped and the rest continue.
+            try:
+                card = tk.Frame(self.scrollable_frame, bg=THEME["colors"]["vm_card_bg"], relief="solid", bd=1)
+                card.pack(fill="x", pady=4, padx=5)
 
-            # Info
-            info_frame = tk.Frame(card, bg=THEME["colors"]["vm_card_bg"])
-            info_frame.pack(side="left", padx=10, pady=8, fill="x", expand=True)
-            
-            tk.Label(info_frame, text=vm["name"], font=THEME["fonts"]["text_bold"], 
-                     bg=THEME["colors"]["vm_card_bg"], anchor="w").pack(anchor="w")
-            tk.Label(info_frame, text=f"RAM: {vm['ram']}MB  |  CPU: {vm['cores']}C/{vm['threads']}T  |  Add-ons: {'Yes' if vm['addons'] else 'No'}", 
-                     font=THEME["fonts"]["small"], bg=THEME["colors"]["vm_card_bg"], fg="gray").pack(anchor="w")
+                # Info
+                info_frame = tk.Frame(card, bg=THEME["colors"]["vm_card_bg"])
+                info_frame.pack(side="left", padx=10, pady=8, fill="x", expand=True)
 
-            # Start Button
-            tk.Button(card, text="▶ Start", bg=THEME["colors"]["btn_success"], fg="white", 
-                      font=THEME["fonts"]["text_bold"], relief="flat", cursor="hand2",
-                      command=lambda v=vm: self.start_vm_real(v)).pack(side="right", padx=10, pady=8)
+                tk.Label(info_frame, text=vm["name"], font=THEME["fonts"]["text_bold"], 
+                         bg=THEME["colors"]["vm_card_bg"], anchor="w").pack(anchor="w")
+                tk.Label(info_frame, text=f"RAM: {vm['ram']}MB  |  CPU: {vm['cores']}C/{vm['threads']}T  |  Add-ons: {'Yes' if vm['addons'] else 'No'}", 
+                         font=THEME["fonts"]["small"], bg=THEME["colors"]["vm_card_bg"], fg="gray").pack(anchor="w")
 
-            # Delete Button
-            tk.Button(card, text="🗑", bg=THEME["colors"]["btn_danger"], fg="white", 
-                      font=("Arial", 10, "bold"), relief="flat", cursor="hand2", width=3,
-                      command=lambda idx=i: self.delete_vm(idx)).pack(side="right", padx=2, pady=8)
+                # Start Button
+                tk.Button(card, text="▶ Start", bg=THEME["colors"]["btn_success"], fg="white", 
+                          font=THEME["fonts"]["text_bold"], relief="flat", cursor="hand2",
+                          command=lambda v=vm: self.start_vm_real(v)).pack(side="right", padx=10, pady=8)
+
+                # Delete Button
+                tk.Button(card, text="🗑", bg=THEME["colors"]["btn_danger"], fg="white", 
+                          font=("Arial", 10, "bold"), relief="flat", cursor="hand2", width=3,
+                          command=lambda idx=i: self.delete_vm(idx)).pack(side="right", padx=2, pady=8)
+            except Exception as e:
+                print(f"Could not render VM at position {i} ({vm}): {e}")
+                continue
 
     def delete_vm(self, index):
         if messagebox.askyesno("Confirm", "Are you sure you want to delete this VM from the list?"):
@@ -339,27 +376,44 @@ class WindowVMApp:
         self.temp_addons = addons
         self.addons_window.destroy()
 
-        # Create folder for VMs
-        os.makedirs("vms", exist_ok=True)
-        
-        # Create VM record
-        vm_info = {
-            "name": self.temp_name,
-            "ram": self.temp_ram,
-            "cores": self.temp_cores,
-            "threads": self.temp_threads,
-            "iso": self.temp_iso,
-            "addons": self.temp_addons,
-            "disk": f"vms/{self.temp_name}.qcow2"
-        }
-        
-        # Add to list and save
-        self.vms_created.append(vm_info)
-        self.save_data()
-        
-        # UPDATE MAIN LIST
-        self.refresh_vm_list()
-        
+        # BUG FIX: this whole block could fail silently (e.g. no permission
+        # to create the "vms" folder, or any other unexpected error). Being
+        # inside a button callback, Tkinter would swallow the exception, only
+        # print it to the console, and the VM would end up neither created
+        # nor shown, with no clue for the user as to why. Now it's caught and
+        # reported with a clear message.
+        try:
+            # Create folder for VMs
+            os.makedirs("vms", exist_ok=True)
+
+            # Create VM record
+            vm_info = {
+                "name": self.temp_name,
+                "ram": self.temp_ram,
+                "cores": self.temp_cores,
+                "threads": self.temp_threads,
+                "iso": self.temp_iso,
+                "addons": self.temp_addons,
+                "disk": f"vms/{self.temp_name}.qcow2"
+            }
+
+            # Add to list and save
+            self.vms_created.append(vm_info)
+            self.save_data()
+
+            # UPDATE MAIN LIST
+            self.refresh_vm_list()
+        except Exception as e:
+            messagebox.showerror("Error creating VM", f"Could not create the VM:\n{e}")
+            return
+
+        # BUG FIX: if there were already enough VMs to fill the visible area,
+        # the new card gets added at the bottom of the list but the scroll
+        # position stays where it was (at the top), leaving the newly created
+        # VM out of view. Force the scroll to the bottom so it's visible right away.
+        self.canvas_vms.update_idletasks()
+        self.canvas_vms.yview_moveto(1.0)
+
         # Clear temporary variables
         self.temp_name = ""
         self.temp_iso = ""
