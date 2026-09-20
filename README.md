@@ -126,6 +126,13 @@ Este proyecto no tiene licencia XD
 
 ---
 
+# Iconos
+
+<img width="872" height="698" alt="Captura de pantalla 2026-09-19 211711" src="https://github.com/user-attachments/assets/757b2742-518e-4991-96c2-9917578ad403" />
+<img width="826" height="712" alt="Captura de pantalla 2026-09-19 211039" src="https://github.com/user-attachments/assets/a276fd0b-5dab-4410-91cd-847276065c6b" />
+<img width="797" height="550" alt="Captura de pantalla 2026-09-19 195338" src="https://github.com/user-attachments/assets/4e7beda3-c6cd-4471-abc8-a94e5fe12a05" />
+
+
 <div align="center">
 
 ### Desarrollado con Python, Tkinter y mucha pasión por los sistemas operativos.
