@@ -128,6 +128,6 @@ Este proyecto no tiene licencia
 <div align="center">
 
 ### Desarrollado con Python, Tkinter y mucha pasión por los sistemas operativos.
-¿Te sirvió para probar tus imágenes de disco? ¡Déjame una ⭐ en el repositorio!
+¿Te ha gustado tanto? ¡Déjame una ⭐ en el repositorio!
 
 </div>
