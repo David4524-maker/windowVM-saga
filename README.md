@@ -62,13 +62,6 @@ Antes de ejecutar **windowVM**, asegúrate de tener instalado lo siguiente:
 
 ---
 
-## Languages / Idiomas
-
-- 🇪🇸 [Versión en Español](windowvm.py)
-- 🇬🇧 [English Version](windowvm-english.py)
-
----
-
 ### Descargar ISO
 
 Puedes ir a [Internet Archive](https://archive.org) para descargar las ISO
@@ -112,30 +105,11 @@ Para evitar lentitud o congelamientos al emular sistemas modernos, **windowVM** 
 
 > **Nota para usuarios de Windows:** Recuerda tener activada la característica opcional **"Plataforma de hipervisor de Windows"** en tu Panel de Control para que QEMU funcione a la velocidad de tu procesador real.
 
----
-
-## Eco-sistema windowVM
-
--ES [Version Español](windowvm.py)
-
--EN [Version Ingles](windowvm_english.py)
-
--MACOS [Version macOS](windowvm_macos.py)
-
--LINUX [Version Linux](windowvm_linux.py)
-
----
-
-## Licencia
-
-Este proyecto no tiene licencia XD
 
 ---
 
 # Iconos
 
-<img width="872" height="698" alt="Captura de pantalla 2026-09-19 211711" src="https://github.com/user-attachments/assets/757b2742-518e-4991-96c2-9917578ad403" />
-<img width="826" height="712" alt="Captura de pantalla 2026-09-19 211039" src="https://github.com/user-attachments/assets/a276fd0b-5dab-4410-91cd-847276065c6b" />
 <img width="797" height="550" alt="Captura de pantalla 2026-09-19 195338" src="https://github.com/user-attachments/assets/4e7beda3-c6cd-4471-abc8-a94e5fe12a05" />
 
 
